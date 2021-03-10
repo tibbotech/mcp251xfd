@@ -1,0 +1,117 @@
+/*
+ * Linux TPP3 Gen 2 - LTPP3g2 base board definition
+ * Copyright (C) 2020 Tibbo Tech. - http://tibbo.com/tps/
+ * License: GPLv2 or later
+ */
+/dts-v1/;
+
+#include "sp7021-ltpp3g2revD.dtsi"
+
+/ {
+    model = "SP7021 TPPs3 Gen 2 mcp251xFD hw SPI";
+    clocks {
+	can0_clk: can0_clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency  = <10000000>;	// 10
+//		clock-frequency  = <1000000>;	// 10
+	};
+	can1_clk: can1_clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency  = <10000000>; // 10
+//		clock-frequency  = <1000000>; // 10
+	};
+    };
+};
+
+/* 51 (SPI) on s1 */
+&spi_controller0 {  status = "okay";
+  pinctrl-names = "default";
+  pinctrl-0 = <&pins_spim0>;
+  tps-sock = "s1";
+  can0: can@0 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&pins_spidev0>;
+    compatible = "microchip,mcp2518fd";
+    reg = <0>;
+    spi-max-frequency = <40000000>;
+    clocks = <&can0_clk>;
+    interrupt-parent = <&intc>;
+    interrupts = <120 IRQ_TYPE_LEVEL_LOW>;
+    microchip,rx-int-gpios = <&pctl 13 GPIO_ACTIVE_LOW>;
+//    dv_iocon = <0x80000000>;
+    dv_iocon = <0x20030300>;
+//    dv_oscva = <0x60>;
+    dv_oscva = <0x80000000>;
+//    dv_nober;
+//    dv_noslp;
+  };
+};
+/* 51 (SPI) on s5 */
+&spi_controller1 {  status = "okay";
+  pinctrl-names = "default";
+  pinctrl-0 = <&pins_spim1>;
+  tps-sock = "s5";
+  can1: can@0 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&pins_spidev1>;
+    compatible = "microchip,mcp2518fd";
+    reg = <0>;
+    spi-max-frequency = <40000000>;
+    clocks = <&can1_clk>;
+    interrupt-parent = <&intc>;
+    interrupts = <121 IRQ_TYPE_LEVEL_LOW>;
+    microchip,rx-int-gpios = <&pctl 21 GPIO_ACTIVE_LOW>;
+//    dv_iocon = <0x80000000>;
+    dv_iocon = <0x20030300>;
+//    dv_oscva = <0x60>;
+    dv_oscva = <0x80000000>;
+//    dv_nober;
+//    dv_noslp;
+  };
+};
+&pctl {
+/* 51 (SPI) on s1 */
+ pins_spim0: pins_spim0 {
+ sppctl,pins = <
+      SPPCTL_IOPAD(8,SPPCTL_PCTL_G_PMUX,MUXF_SPIM0_EN,0)
+      SPPCTL_IOPAD(9,SPPCTL_PCTL_G_PMUX,MUXF_SPIM0_DI,0)
+      SPPCTL_IOPAD(10,SPPCTL_PCTL_G_PMUX,MUXF_SPIM0_DO,0)
+      SPPCTL_IOPAD(11,SPPCTL_PCTL_G_PMUX,MUXF_SPIM0_CLK,0)
+    >;
+ };
+ pins_spidev0: pins_spidev0 {
+ sppctl,pins = <
+      SPPCTL_IOPAD(12,SPPCTL_PCTL_G_GPIO,0,0)
+      SPPCTL_IOPAD(13,SPPCTL_PCTL_G_GPIO,0,0)	// mcp int1 should be GPIO
+      SPPCTL_IOPAD(14,SPPCTL_PCTL_G_GPIO,0,0)	// SOF
+      SPPCTL_IOPAD(15,SPPCTL_PCTL_G_PMUX,MUXF_GPIO_INT0,0)	// mcp int
+//      SPPCTL_IOPAD(15,SPPCTL_PCTL_G_GPIO,0,0)	// mcp int
+    >;
+ };
+ pins_spim1: pins_spim1 {
+ sppctl,pins = <
+      SPPCTL_IOPAD(16,SPPCTL_PCTL_G_PMUX,MUXF_SPIM1_EN,0)
+      SPPCTL_IOPAD(17,SPPCTL_PCTL_G_PMUX,MUXF_SPIM1_DI,0)
+      SPPCTL_IOPAD(18,SPPCTL_PCTL_G_PMUX,MUXF_SPIM1_DO,0)
+      SPPCTL_IOPAD(19,SPPCTL_PCTL_G_PMUX,MUXF_SPIM1_CLK,0)
+    >;
+ };
+ pins_spidev1: pins_spidev1 {
+ sppctl,pins = <
+      SPPCTL_IOPAD(20,SPPCTL_PCTL_G_GPIO,0,0)
+      SPPCTL_IOPAD(21,SPPCTL_PCTL_G_GPIO,0,0)
+      SPPCTL_IOPAD(22,SPPCTL_PCTL_G_GPIO,0,0)
+      SPPCTL_IOPAD(23,SPPCTL_PCTL_G_PMUX,MUXF_GPIO_INT1,0)	// mcp int
+//      SPPCTL_IOPAD(23,SPPCTL_PCTL_G_GPIO,0,0)	// mcp int
+    >;
+ };
+
+};
+
+/ {
+    soc@B {
+
+    };
+};

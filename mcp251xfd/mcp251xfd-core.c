@@ -85,8 +85,13 @@ static const struct can_bittiming_const mcp251xfd_data_bittiming_const = {
 // Dv: for filtering
 enum filterT_t {  FILTERT_SID, FILTERT_EID, FILTERT_BOTH };
 struct filter_t {  enum filterT_t t;  u32 id;  u32 mask; };
-struct filter_t filter_ids[ 32];
-u16 filter_sz;
+struct filter {
+// char name[ IFNAMSIZ];
+ int name;
+ u16 filter_sz;
+ struct filter_t filter_ids[ 32];
+};
+struct filter filters[ 5];
 // Dv: for filtering /
 
 static const char *__mcp251xfd_get_model_str(enum mcp251xfd_model model)
@@ -913,13 +918,22 @@ static int mcp251xfd_dv_setfilterN(struct mcp251xfd_priv *priv, enum filterT_t _
  netdev_info( priv->ndev, "%s():%d regF[%d]=%X off:%X mas:%X err:%d\n", __FUNCTION__, __LINE__, _n, regv, MCP251XFD_REG_FLTCON( _n >> 2), MCP251XFD_REG_FLTCON_FLT_MASK( _n), err);
  return( 0);  }
 
-static int mcp251xfd_dv_setfilter(struct mcp251xfd_priv *priv, u32 _fifon) {
+static struct filter *mcp251xfd_dv_getfilter(struct mcp251xfd_priv *priv) {
+ u32 i;
+ struct filter *fp = NULL;
+ for ( i = 0; i < sizeof( filters)/sizeof( struct filter); i++) {
+   if ( filters[ i].name == priv->spi->irq) fp = &filters[ i];
+ }
+ if ( fp) netdev_info( priv->ndev, "%s():%d filter is found for %d\n", __FUNCTION__, __LINE__, fp->name);
+ return( fp);  }
+
+static int mcp251xfd_dv_setfilter(struct mcp251xfd_priv *priv, u32 _fifon, struct filter *_fp) {
  u32 i, idx, fifon;
- netdev_info( priv->ndev, "%s():%d filter_ids size:%d for fifon:%d\n", __FUNCTION__, __LINE__, filter_sz, _fifon);
- for ( i = 0; i < filter_sz; i++) {
-   if ( !filter_ids[ i].id && !filter_ids[ i].mask) continue;
+ netdev_info( priv->ndev, "%s():%d filter_ids size:%d for fifon:%d\n", __FUNCTION__, __LINE__, _fp->filter_sz, _fifon);
+ for ( i = 0; i < _fp->filter_sz; i++) {
+   if ( !_fp->filter_ids[ i].id && !_fp->filter_ids[ i].mask) continue;
    idx = i;  fifon = _fifon;
-   mcp251xfd_dv_setfilterN( priv, filter_ids[ i].t, filter_ids[ i].id, filter_ids[ i].mask, idx, fifon);
+   mcp251xfd_dv_setfilterN( priv, _fp->filter_ids[ i].t, _fp->filter_ids[ i].id, _fp->filter_ids[ i].mask, idx, fifon);
  }
  return( 0);  }
 // by Dv for SFLT /
@@ -1017,6 +1031,7 @@ static int mcp251xfd_chip_fifo_init(const struct mcp251xfd_priv *priv)
 
 	/* RX FIFOs */
 	u32 rxnr = 0;
+	struct filter *fp = mcp251xfd_dv_getfilter( priv);
 	mcp251xfd_for_each_rx_ring(priv, rx_ring, n) {
 		err = mcp251xfd_chip_rx_fifo_init_one(priv, rx_ring);
 		if (err)
@@ -1024,15 +1039,15 @@ static int mcp251xfd_chip_fifo_init(const struct mcp251xfd_priv *priv)
 
 netdev_info( priv->ndev, "%s():%d ring:%d \n", __FUNCTION__, __LINE__, n);
 		rxnr = rx_ring->fifo_nr;
-		if ( filter_sz < 1) {
+		if ( !fp) {
 			err = mcp251xfd_chip_rx_filter_init_one(priv, rx_ring);
 			if (err)
 				return err;
 
 		}
 	}
-	if ( filter_sz > 0) {
-		mcp251xfd_dv_setfilter( priv, rxnr);
+	if ( fp && fp->filter_sz > 0) {
+		mcp251xfd_dv_setfilter( priv, rxnr, fp);
 	}
 
 	return 0;
@@ -2968,18 +2983,25 @@ static int mcp251xfd_probe(struct spi_device *spi)
 // by Dv: iocon, oscva, nober, noslp /
 // by Dv: reading filter
 	u32 idsn, off, arg0, arg1, arg2, i;
-	while ( of_get_property(np, "filter-ids", &idsn)) {
+	struct filter *fp = NULL;
+	for ( i = 0; i < sizeof( filters)/sizeof( struct filter); i++) {
+	  if ( filters[ i].name > 0) continue;
+	  fp = &filters[ i];
+	  dev_err( &spi->dev, "New filter ID found at %d\n", i);
+	  break;
+	}
+	while ( fp && of_get_property(np, "filter-ids", &idsn)) {
 	    idsn /= ( sizeof( idsn) * 3);
 		dev_err( &spi->dev, "Filter-ids contains %d items.\n", idsn);
-		filter_sz = 0;
-		for ( i = 0; i < idsn && i < sizeof( filter_ids)/sizeof( filter_ids[ 0]); i++) {
+		fp->filter_sz = 0;
+		for ( i = 0; i < idsn && i < sizeof( fp->filter_ids)/sizeof( fp->filter_ids[ 0]); i++) {
 		  off = i * 3;  // * num_args
 		  if ( of_property_read_u32_index( np, "filter-ids", off + 0, &arg0)) break;
 		  if ( of_property_read_u32_index( np, "filter-ids", off + 1, &arg1)) break;
 		  if ( of_property_read_u32_index( np, "filter-ids", off + 2, &arg2)) break;
  		  dev_err( &spi->dev, "filter-id[%d] type%d =%X|%X\n", i, arg0, arg1, arg2);
-		  filter_ids[ i].t = arg0;  filter_ids[ i].id = arg1;  filter_ids[ i].mask = arg2;
-		  filter_sz++;
+		  fp->filter_ids[ i].t = arg0;  fp->filter_ids[ i].id = arg1;  fp->filter_ids[ i].mask = arg2;
+		  fp->filter_sz++;
 		}
 		break;  }
 // by Dv: reading filter /
@@ -3044,6 +3066,7 @@ static int mcp251xfd_probe(struct spi_device *spi)
 	ndev->flags |= IFF_ECHO;
 
 	priv = netdev_priv(ndev);
+
 	spi_set_drvdata(spi, priv);
 	// by Dv: iocon, oscva, nober, noslp
 	priv->dv_iocon = dviocon;
@@ -3113,6 +3136,9 @@ dev_err( &spi->dev, "%s():%d spi_setup:%d \n", __FUNCTION__, __LINE__, err);
 	if (err)
 		goto out_free_candev;
 
+// by Dv for filters
+	if ( fp) fp->name = priv->spi->irq;
+// by Dv for filters /
 	err = mcp251xfd_regmap_init(priv);
 // by Dv: dbg
 dev_err( &spi->dev, "%s():%d spi_setup:%d \n", __FUNCTION__, __LINE__, err);

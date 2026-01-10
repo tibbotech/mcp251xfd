@@ -1047,7 +1047,7 @@ netdev_info( priv->ndev, "%s():%d ring:%d \n", __FUNCTION__, __LINE__, n);
 
 		}
 	}
-	if ( fp && fp->filter_sz > 0) {
+	if ( fp) {
 		mcp251xfd_dv_setfilter( priv, rxnr, fp);
 	}
 

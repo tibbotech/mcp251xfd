@@ -924,6 +924,7 @@ static struct filter *mcp251xfd_dv_getfilter(struct mcp251xfd_priv *priv) {
  for ( i = 0; i < sizeof( filters)/sizeof( struct filter); i++) {
    if ( filters[ i].name == priv->spi->irq) fp = &filters[ i];
  }
+ if ( fp && fp->filter_sz < 1) fp = NULL;
  if ( fp) netdev_info( priv->ndev, "%s():%d filter is found for %d\n", __FUNCTION__, __LINE__, fp->name);
  return( fp);  }
 
